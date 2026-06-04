@@ -3,7 +3,16 @@ const input = document.querySelector("#message-input");
 const messages = document.querySelector("#messages");
 const results = document.querySelector("#results");
 const filters = document.querySelector("#filters");
+const matchCount = document.querySelector("#match-count");
 const userHistory = [];
+
+document.querySelectorAll("[data-prompt]").forEach((button) => {
+  button.addEventListener("click", () => {
+    input.value = button.dataset.prompt || "";
+    input.focus();
+    form.requestSubmit();
+  });
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -30,7 +39,7 @@ form.addEventListener("submit", async (event) => {
     renderResults(payload.events || []);
     addMessage("assistant", buildAssistantMessage(payload.events || []));
   } catch (error) {
-    addMessage("assistant", error.message);
+    addMessage("assistant", error.message, { error: true });
   } finally {
     setLoading(false);
   }
@@ -43,9 +52,9 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
-function addMessage(role, text) {
+function addMessage(role, text, options = {}) {
   const node = document.createElement("div");
-  node.className = `message ${role}`;
+  node.className = `message ${role}${options.error ? " error" : ""}`;
   node.textContent = text;
   messages.appendChild(node);
   messages.scrollTop = messages.scrollHeight;
@@ -53,6 +62,7 @@ function addMessage(role, text) {
 
 function renderResults(events) {
   results.replaceChildren();
+  matchCount.textContent = String(events.length);
 
   if (events.length === 0) {
     const empty = document.createElement("div");
@@ -94,7 +104,7 @@ function formatDateTime(event) {
 
 function setLoading(loading) {
   form.querySelector("button").disabled = loading;
-  form.querySelector("button").textContent = loading ? "Searching" : "Send";
+  form.querySelector("button span").textContent = loading ? "Thinking" : "Send";
 }
 
 function buildAssistantMessage(events) {

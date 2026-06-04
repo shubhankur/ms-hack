@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeEvent, parseTracksFromHtml } from "../src/techWeek.js";
+import { buildEventsUrl, normalizeEvent, parseTracksFromHtml } from "../src/techWeek.js";
 
 test("parseTracksFromHtml extracts track slug and label", () => {
   const html = `
@@ -12,6 +12,18 @@ test("parseTracksFromHtml extracts track slug and label", () => {
     { slug: "ai-infra", label: "AI + Infra", sourceUrl: null },
     { slug: "investors", label: "Investors", sourceUrl: null },
   ]);
+});
+
+test("buildEventsUrl includes day and track filters", () => {
+  const url = new URL(
+    buildEventsUrl({ city: "nyc", day: "2026-06-04", track: ["founders"], cursor: 2 })
+  );
+  const input = JSON.parse(url.searchParams.get("input"));
+
+  assert.equal(input.city, "nyc");
+  assert.equal(input.day, "2026-06-04");
+  assert.equal(input.cursor, 2);
+  assert.deepEqual(input.track, ["founders"]);
 });
 
 test("normalizeEvent keeps direct fields and host facets", () => {

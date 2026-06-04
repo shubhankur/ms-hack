@@ -41,8 +41,13 @@ export async function fetchJson(url) {
   return JSON.parse(await fetchText(url));
 }
 
-export function buildEventsUrl({ city = techWeekCity, cursor = 1, track = [] } = {}) {
-  const input = { city, ...defaultInput, track, cursor };
+export function buildEventsUrl({
+  city = techWeekCity,
+  cursor = 1,
+  day = "all",
+  track = [],
+} = {}) {
+  const input = { city, ...defaultInput, day, track, cursor };
   const params = new URLSearchParams({
     input: JSON.stringify(input),
   });
@@ -345,7 +350,9 @@ export async function syncEventsForDay({ city = techWeekCity, date } = {}) {
   await setupDatabase();
 
   const tracks = await fetchTracks({ city });
-  const allEvents = (await fetchAllEvents({ city })).filter((event) => event.date === date);
+  const allEvents = (await fetchAllEvents({ city, day: date })).filter(
+    (event) => event.date === date
+  );
   const selected = new Map(
     allEvents.map((rawEvent) => [
       Number(rawEvent.id),
@@ -355,7 +362,7 @@ export async function syncEventsForDay({ city = techWeekCity, date } = {}) {
   const trackCounts = {};
 
   for (const track of tracks) {
-    const trackEvents = (await fetchAllEvents({ city, track: [track.slug] })).filter(
+    const trackEvents = (await fetchAllEvents({ city, day: date, track: [track.slug] })).filter(
       (event) => event.date === date
     );
     trackCounts[track.slug] = trackEvents.length;

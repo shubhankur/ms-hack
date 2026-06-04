@@ -3,23 +3,38 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tech Week Event Match</title>
+    <title>Tech Week Concierge</title>
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="chat-panel">
-        <header class="topbar">
+    <main class="app-shell">
+      <section class="chat-card" aria-label="Tech Week chat">
+        <header class="chat-header">
           <div>
-            <h1>Tech Week Match</h1>
-            <p>Ask for events by role, goal, topic, and time.</p>
+            <p class="eyebrow">NYC Tech Week</p>
+            <h1>Concierge</h1>
           </div>
-          <span class="status">NYC</span>
+          <div class="live-pill">
+            <span class="pulse"></span>
+            Live
+          </div>
         </header>
+
+        <div class="quick-actions" aria-label="Quick prompts">
+          <button type="button" data-prompt="I am a founder raising funds and free between 2-4 pm today">
+            Founder + fundraising
+          </button>
+          <button type="button" data-prompt="Show me AI events after 5 pm today">
+            AI after 5
+          </button>
+          <button type="button" data-prompt="I want hackathons or builder events today">
+            Builder events
+          </button>
+        </div>
 
         <div id="messages" class="messages" aria-live="polite">
           <div class="message assistant">
-            Try: I am a founder raising funds and free between 2-4pm today.
+            Tell me who you are, what you want from Tech Week, and when you are free. You can keep refining in follow-up messages.
           </div>
         </div>
 
@@ -29,18 +44,34 @@
             name="message"
             autocomplete="off"
             rows="2"
-            placeholder="What kind of events are you looking for?"
+            placeholder="Ask for events by role, goal, topic, and time..."
           ></textarea>
-          <button type="submit">Send</button>
+          <button type="submit">
+            <span>Send</span>
+          </button>
         </form>
       </section>
 
-      <aside class="results-panel">
-        <div class="panel-heading">
-          <h2>Matches</h2>
+      <aside class="results-card" aria-label="Matched events">
+        <header class="results-header">
+          <div>
+            <p class="eyebrow">Matched Agenda</p>
+            <h2>Top Events</h2>
+          </div>
+          <div id="match-count" class="match-count">0</div>
+        </header>
+
+        <section class="filters-wrap">
+          <p>Structured filters</p>
           <pre id="filters" class="filters">{}</pre>
+        </section>
+
+        <div id="results" class="results">
+          <div class="empty-state">
+            <span></span>
+            Start a conversation to see ranked events with RSVP links.
+          </div>
         </div>
-        <div id="results" class="results"></div>
       </aside>
     </main>
 
