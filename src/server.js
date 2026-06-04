@@ -1,6 +1,9 @@
 import http from "node:http";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { rootDir } from "./config.js";
 import { closePool, listEvents, listTracks, setupDatabase } from "./db.js";
-import { recommendEvents } from "./matcher.js";
+import { chatRecommendEvents, recommendEvents } from "./matcher.js";
 import { syncTechWeek } from "./techWeek.js";
 
 const port = Number(process.env.PORT || 8000);
@@ -11,6 +14,18 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/health") {
       return sendJson(response, { ok: true });
+    }
+
+    if (request.method === "GET" && url.pathname === "/") {
+      return sendFile(response, "public/index.html", "text/html; charset=utf-8");
+    }
+
+    if (request.method === "GET" && url.pathname === "/app.css") {
+      return sendFile(response, "public/app.css", "text/css; charset=utf-8");
+    }
+
+    if (request.method === "GET" && url.pathname === "/app.js") {
+      return sendFile(response, "public/app.js", "application/javascript; charset=utf-8");
     }
 
     if (request.method === "GET" && url.pathname === "/tracks") {
@@ -31,6 +46,18 @@ const server = http.createServer(async (request, response) => {
       return sendJson(
         response,
         { events: await recommendEvents({ message: body.message, limit: body.limit || 10 }) }
+      );
+    }
+
+    if (request.method === "POST" && url.pathname === "/chat") {
+      const body = await readJson(request);
+      return sendJson(
+        response,
+        await chatRecommendEvents({
+          message: body.message,
+          messages: body.messages || [],
+          limit: body.limit || 10,
+        })
       );
     }
 
@@ -59,6 +86,16 @@ function sendJson(response, payload, status = 200) {
   response.writeHead(status, {
     "content-type": "application/json",
     "content-length": Buffer.byteLength(body),
+  });
+  response.end(body);
+}
+
+async function sendFile(response, relativePath, contentType) {
+  const filePath = path.join(rootDir, relativePath);
+  const body = await fs.readFile(filePath);
+  response.writeHead(200, {
+    "content-type": contentType,
+    "content-length": body.length,
   });
   response.end(body);
 }

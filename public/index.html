@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tech Week Event Match</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="chat-panel">
+        <header class="topbar">
+          <div>
+            <h1>Tech Week Match</h1>
+            <p>Ask for events by role, goal, topic, and time.</p>
+          </div>
+          <span class="status">NYC</span>
+        </header>
+
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="message assistant">
+            Try: I am a founder raising funds and free between 2-4pm today.
+          </div>
+        </div>
+
+        <form id="chat-form" class="composer">
+          <textarea
+            id="message-input"
+            name="message"
+            autocomplete="off"
+            rows="2"
+            placeholder="What kind of events are you looking for?"
+          ></textarea>
+          <button type="submit">Send</button>
+        </form>
+      </section>
+
+      <aside class="results-panel">
+        <div class="panel-heading">
+          <h2>Matches</h2>
+          <pre id="filters" class="filters">{}</pre>
+        </div>
+        <div id="results" class="results"></div>
+      </aside>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

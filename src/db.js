@@ -308,3 +308,44 @@ export async function searchEvents({ query, limit = 10 }) {
   );
   return result.rows;
 }
+
+export async function listEventsForMatch({ date, startTime, endTime, limit = 500 }) {
+  const result = await getPool().query(
+    `
+    SELECT
+      e.id,
+      e.city,
+      e.event_date,
+      e.start_time,
+      e.location,
+      e.name,
+      e.company,
+      e.rsvp_url,
+      e.is_invite_only,
+      e.sponsor_tier,
+      e.time_label,
+      e.location_labels,
+      e.audience,
+      e.topic,
+      e.format,
+      e.intent,
+      e.keywords,
+      e.summary,
+      COALESCE(array_agg(DISTINCT et.track_slug) FILTER (WHERE et.track_slug IS NOT NULL), '{}') AS tracks,
+      COALESCE(array_agg(DISTINCT h.label) FILTER (WHERE h.label IS NOT NULL), '{}') AS hosts
+    FROM tech_week_events e
+    LEFT JOIN event_tracks et ON et.event_id = e.id
+    LEFT JOIN event_hosts eh ON eh.event_id = e.id
+    LEFT JOIN hosts h ON h.host_key = eh.host_key
+    WHERE
+      e.event_date = $1::date
+      AND e.start_time >= $2::time
+      AND e.start_time < $3::time
+    GROUP BY e.id
+    ORDER BY e.start_time, e.name
+    LIMIT $4
+    `,
+    [date, startTime, endTime, limit]
+  );
+  return result.rows;
+}

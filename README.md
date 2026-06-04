@@ -95,6 +95,9 @@ Create `.env`:
 
 ```bash
 DB_URL=postgresql://...
+AZURE_AI_ENDPOINT=https://your-resource.services.ai.azure.com/openai/v1
+AZURE_AI_KEY=...
+AZURE_AI_MODEL=gpt-5.5
 ```
 
 If your DB password contains `@`, URL-encode it as `%40`.
@@ -114,6 +117,26 @@ npm run sync:day -- --date 2026-06-04
 npm run sync
 npm run serve
 ```
+
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The chat endpoint uses Azure to parse natural language into:
+
+```text
+date
+timeWindow
+audience
+topic
+format
+intent
+keywords
+```
+
+Then Postgres returns deterministic scored matches.
 
 Inspect:
 

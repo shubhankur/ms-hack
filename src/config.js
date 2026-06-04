@@ -37,6 +37,9 @@ export const techWeekCity = process.env.TECH_WEEK_CITY || "nyc";
 export const techWeekBaseUrl =
   process.env.TECH_WEEK_BASE_URL || "https://www.tech-week.com/calendar";
 export const appTimezone = process.env.APP_TIMEZONE || "America/New_York";
+export const azureAiEndpoint = process.env.AZURE_AI_ENDPOINT || "";
+export const azureAiKey = process.env.AZURE_AI_KEY || "";
+export const azureAiModel = process.env.AZURE_AI_MODEL || "";
 export const userAgent =
   process.env.MS_HACK_USER_AGENT ||
   "ms-hack-tech-week-ingestor/0.1";
@@ -46,6 +49,10 @@ export function requireDbUrl() {
     throw new Error("Missing DB_URL. Add it to .env before running database commands.");
   }
   return dbUrl;
+}
+
+export function hasAzureAiConfig() {
+  return Boolean(azureAiEndpoint && azureAiKey && azureAiModel);
 }
 
 export function todayDateInTimezone(timeZone = appTimezone) {
