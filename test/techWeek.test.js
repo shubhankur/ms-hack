@@ -16,13 +16,20 @@ test("parseTracksFromHtml extracts track slug and label", () => {
 
 test("buildEventsUrl includes day and track filters", () => {
   const url = new URL(
-    buildEventsUrl({ city: "nyc", day: "2026-06-04", track: ["founders"], cursor: 2 })
+    buildEventsUrl({
+      city: "nyc",
+      day: "2026-06-04",
+      track: ["founders"],
+      q: "demo day",
+      cursor: 2,
+    })
   );
   const input = JSON.parse(url.searchParams.get("input"));
 
   assert.equal(input.city, "nyc");
   assert.equal(input.day, "2026-06-04");
   assert.equal(input.cursor, 2);
+  assert.equal(input.q, "demo day");
   assert.deepEqual(input.track, ["founders"]);
 });
 

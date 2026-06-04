@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fallbackParseUserEventQuery, normalizeParsedQuery } from "../src/llm.js";
+import {
+  fallbackParseScrapeQuery,
+  fallbackParseUserEventQuery,
+  normalizeParsedQuery,
+  normalizeScrapePlan,
+} from "../src/llm.js";
 import { normalizeUserQuery, scoreEvent } from "../src/matcher.js";
 
 test("normalizeUserQuery keeps useful matching tokens", () => {
@@ -71,4 +76,35 @@ test("fallback parser reads follow-up messages with prior context", () => {
   assert.deepEqual(parsed.audience, ["founders"]);
   assert.deepEqual(parsed.intent, ["fundraising"]);
   assert.deepEqual(parsed.timeWindow, { start: "14:00:00", end: "16:00:00" });
+});
+
+test("normalizeScrapePlan keeps only Tech Week scraper filters", () => {
+  const plan = normalizeScrapePlan(
+    {
+      day: "2026-06-04",
+      track: ["founders", "tourists"],
+      q: " Example VC ",
+      limit: 99,
+    },
+    {
+      tracks: [{ slug: "founders" }, { slug: "investors" }],
+      limitFallback: 10,
+    }
+  );
+
+  assert.deepEqual(plan, {
+    day: "2026-06-04",
+    track: ["founders"],
+    q: "Example VC",
+    limit: 50,
+  });
+});
+
+test("fallback scrape parser maps fundraising text to track filters", () => {
+  const plan = fallbackParseScrapeQuery("first 7 founder events for raising capital today", {
+    tracks: [{ slug: "founders" }, { slug: "investors" }, { slug: "engineers" }],
+  });
+
+  assert.deepEqual(plan.track, ["founders", "investors"]);
+  assert.equal(plan.limit, 7);
 });

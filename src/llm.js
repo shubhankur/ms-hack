@@ -77,6 +77,49 @@ export async function parseUserEventQuery(message, { messages = [] } = {}) {
   return normalizeParsedQuery(JSON.parse(content));
 }
 
+export async function parseScrapeQuery(message, { tracks = [], limitFallback = 10 } = {}) {
+  if (!hasAzureAiConfig()) {
+    return fallbackParseScrapeQuery(message, { tracks, limitFallback });
+  }
+
+  const endpoint = azureAiEndpoint.replace(/\/$/, "");
+  const response = await fetch(`${endpoint}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "api-key": azureAiKey,
+    },
+    body: JSON.stringify({
+      model: azureAiModel,
+      messages: [
+        {
+          role: "system",
+          content: buildScrapeSystemPrompt(tracks, limitFallback),
+        },
+        {
+          role: "user",
+          content: String(message || ""),
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 300,
+    }),
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Azure scrape parse failed ${response.status}: ${text.slice(0, 300)}`);
+  }
+
+  const payload = JSON.parse(text);
+  const content = payload.choices?.[0]?.message?.content || payload.choices?.[0]?.content;
+  if (!content) {
+    throw new Error("Azure scrape parse returned no content");
+  }
+
+  return normalizeScrapePlan(JSON.parse(content), { tracks, limitFallback });
+}
+
 export function normalizeParsedQuery(parsed) {
   const today = todayDateInTimezone(appTimezone);
   const date = isIsoDate(parsed?.date) ? parsed.date : today;
@@ -89,6 +132,20 @@ export function normalizeParsedQuery(parsed) {
     format: normalizeAllowedArray(parsed?.format, allowed.format),
     intent: normalizeAllowedArray(parsed?.intent, allowed.intent),
     keywords: normalizeKeywords(parsed?.keywords),
+  };
+}
+
+export function normalizeScrapePlan(parsed, { tracks = [], limitFallback = 10 } = {}) {
+  const today = todayDateInTimezone(appTimezone);
+  const trackChoices = knownTrackSlugs(tracks);
+  const day = parsed?.day === "all" ? "all" : isIsoDate(parsed?.day) ? parsed.day : today;
+  const limit = clampNumber(parsed?.limit, limitFallback, 1, 50);
+
+  return {
+    day,
+    track: normalizeAllowedArray(parsed?.track, trackChoices),
+    q: normalizeSearchQuery(parsed?.q),
+    limit,
   };
 }
 
@@ -129,6 +186,89 @@ export function fallbackParseUserEventQuery(message, { messages = [] } = {}) {
     ],
     keywords: text.split(/\s+/).filter((word) => word.length > 3).slice(0, 8),
   });
+}
+
+export function fallbackParseScrapeQuery(message, { tracks = [], limitFallback = 10 } = {}) {
+  const text = String(message || "").toLowerCase();
+  const track = [
+    ...valueIf(/\bfounder|startup|operator|ceo\b/.test(text), "founders"),
+    ...valueIf(/\binvestor|vc|venture|angel|rais|fundrais|capital\b/.test(text), "investors"),
+    ...valueIf(/\bengineer|developer|builder|technical\b/.test(text), "engineers"),
+    ...valueIf(/\bstudent|college|university\b/.test(text), "students"),
+    ...valueIf(/\bgtm|sales|marketing\b/.test(text), "gtm"),
+    ...valueIf(/\bai|llm|agent|infra\b/.test(text), "ai-infra"),
+    ...valueIf(/\bfintech|finance|payment\b/.test(text), "fintech"),
+    ...valueIf(/\bhackathon|hack\b/.test(text), "hackathons"),
+  ];
+
+  return normalizeScrapePlan(
+    {
+      day: parseScrapeDay(text),
+      track,
+      q: "",
+      limit: parseScrapeLimit(text) || limitFallback,
+    },
+    { tracks, limitFallback }
+  );
+}
+
+function buildScrapeSystemPrompt(tracks, limitFallback) {
+  const today = todayDateInTimezone(appTimezone);
+  const trackList = knownTrackSlugs(tracks).join(", ");
+  return `
+You convert a user's natural-language NYC Tech Week scraping request into Tech Week API filters.
+Current date is ${today}. Timezone is ${appTimezone}.
+
+Return JSON only with this exact shape:
+{
+  "day": "YYYY-MM-DD",
+  "track": [],
+  "q": "",
+  "limit": ${limitFallback}
+}
+
+Allowed track values: ${trackList}
+
+Rules:
+- Use "day": "${today}" for today or when no day is given.
+- Use "day": "all" only if the user asks for all days or the whole event.
+- Track must only contain allowed track slugs.
+- Map "AI", "LLM", or "infra" to "ai-infra".
+- Map "builder" or "developer" to "engineers"; map "hackathon" to "hackathons".
+- Map "raising", "fundraising", "VC", or "capital" to "investors"; keep "founders" too if the user says founder.
+- Use q only for a specific host, company, venue, or phrase not represented by day/track.
+- Use limit from the user if present. Otherwise use ${limitFallback}. Never exceed 50.
+`.trim();
+}
+
+function knownTrackSlugs(tracks) {
+  const source = tracks.length > 0
+    ? tracks.map((track) => track.slug)
+    : ["ai-infra", "hackathons", "fintech", "students", "engineers", "founders", "gtm", "investors"];
+  return [...new Set(source.map(String).filter(Boolean))];
+}
+
+function parseScrapeDay(text) {
+  if (/\ball\b|whole event|entire event/.test(text)) {
+    return "all";
+  }
+
+  const isoDate = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
+  if (isoDate) {
+    return isoDate;
+  }
+
+  if (text.includes("tomorrow")) {
+    return addDays(todayDateInTimezone(appTimezone), 1);
+  }
+
+  return todayDateInTimezone(appTimezone);
+}
+
+function parseScrapeLimit(text) {
+  const match = text.match(/\b(?:first|top|limit|show|get|scrape)\s+(\d{1,2})\b/) ||
+    text.match(/\b(\d{1,2})\s+events?\b/);
+  return match ? Number(match[1]) : null;
 }
 
 function buildSystemPrompt() {
@@ -216,6 +356,18 @@ function normalizeKeywords(value) {
   return [...new Set(values.map(String).map((item) => item.toLowerCase().trim()).filter(Boolean))].slice(0, 12);
 }
 
+function normalizeSearchQuery(value) {
+  return typeof value === "string" ? value.trim().slice(0, 120) : "";
+}
+
+function clampNumber(value, fallback, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.trunc(number)));
+}
+
 function normalizeTimeWindow(value) {
   const start = isTime(value?.start) ? value.start : "00:00:00";
   const end = isTime(value?.end) ? value.end : "23:59:59";
@@ -253,4 +405,10 @@ function isTime(value) {
 
 function valueIf(condition, value) {
   return condition ? [value] : [];
+}
+
+function addDays(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }

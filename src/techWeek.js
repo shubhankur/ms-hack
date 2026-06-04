@@ -46,8 +46,9 @@ export function buildEventsUrl({
   cursor = 1,
   day = "all",
   track = [],
+  q = "",
 } = {}) {
-  const input = { city, ...defaultInput, day, track, cursor };
+  const input = { city, ...defaultInput, q, day, track, cursor };
   const params = new URLSearchParams({
     input: JSON.stringify(input),
   });
@@ -416,6 +417,87 @@ export async function syncEventsForDay({ city = techWeekCity, date } = {}) {
   }
 }
 
+export async function syncEventsFromScrapePlan({
+  city = techWeekCity,
+  day = "all",
+  track = [],
+  q = "",
+  limit = 10,
+  tracks = null,
+} = {}) {
+  await setupDatabase();
+
+  const sourceTracks = tracks || (await fetchTracks({ city }));
+  const tracksBySlug = new Map(sourceTracks.map((item) => [item.slug, item]));
+  const wantedTracks = track.filter((slug) => tracksBySlug.has(slug));
+  const selected = new Map();
+
+  if (wantedTracks.length > 0) {
+    for (const slug of wantedTracks) {
+      const rawEvents = await fetchAllEvents({ city, day, track: [slug], q });
+      for (const rawEvent of rawEvents) {
+        if (!matchesDay(rawEvent, day)) {
+          continue;
+        }
+
+        const id = Number(rawEvent.id);
+        if (!selected.has(id)) {
+          selected.set(id, { rawEvent, tracks: new Map() });
+        }
+        selected.get(id).tracks.set(slug, tracksBySlug.get(slug));
+      }
+    }
+  } else {
+    const rawEvents = await fetchAllEvents({ city, day, q });
+    for (const rawEvent of rawEvents) {
+      if (!matchesDay(rawEvent, day)) {
+        continue;
+      }
+      selected.set(Number(rawEvent.id), { rawEvent, tracks: new Map() });
+    }
+  }
+
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await upsertTracks(client, sourceTracks);
+
+    const events = [];
+    const items = [...selected.values()].slice(0, limit);
+    const eventIds = items.map((item) => Number(item.rawEvent.id));
+    if (eventIds.length > 0) {
+      await client.query("DELETE FROM event_tracks WHERE event_id = ANY($1::bigint[])", [
+        eventIds,
+      ]);
+    }
+
+    for (const item of items) {
+      const eventTracks = [...item.tracks.values()];
+      const event = normalizeEvent(item.rawEvent, { tracks: eventTracks });
+      await upsertEvent(client, event);
+      for (const eventTrack of eventTracks) {
+        await addEventTrack(client, event.id, eventTrack.slug);
+      }
+      events.push(toEventPreview(event, eventTracks));
+    }
+
+    await client.query("COMMIT");
+    return {
+      city,
+      plan: { day, track: wantedTracks, q, limit },
+      fetched: selected.size,
+      inserted: events.length,
+      withRsvp: events.filter((event) => event.rsvpUrl).length,
+      events,
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 function inferFormat(text, trackSlugs) {
   if (/\bhackathon\b/.test(text) || trackSlugs.includes("hackathons")) return "hackathon";
   if (/\bbreakfast\b/.test(text)) return "breakfast";
@@ -483,6 +565,10 @@ function toEventPreview(event, tracks) {
     keywords: event.keywords,
     summary: event.summary,
   };
+}
+
+function matchesDay(rawEvent, day) {
+  return day === "all" || rawEvent.date === day;
 }
 
 function valuesWhen(condition, values) {

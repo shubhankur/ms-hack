@@ -19,6 +19,7 @@ form.addEventListener("submit", async (event) => {
   const message = input.value.trim();
   if (!message) return;
 
+  const pageScrollY = window.scrollY;
   input.value = "";
   userHistory.push(message);
   addMessage("user", message);
@@ -42,6 +43,7 @@ form.addEventListener("submit", async (event) => {
     addMessage("assistant", error.message, { error: true });
   } finally {
     setLoading(false);
+    keepPagePosition(pageScrollY);
   }
 });
 
@@ -58,6 +60,12 @@ function addMessage(role, text, options = {}) {
   node.textContent = text;
   messages.appendChild(node);
   messages.scrollTop = messages.scrollHeight;
+}
+
+function keepPagePosition(scrollY) {
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: scrollY, left: 0 });
+  });
 }
 
 function renderResults(events) {

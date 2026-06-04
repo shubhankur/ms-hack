@@ -114,6 +114,7 @@ Run:
 npm run db:setup
 npm run sample -- --limit 10
 npm run sync:day -- --date 2026-06-04
+npm run scrape -- "scrape 10 founder and investor events today"
 npm run sync
 npm run serve
 ```
@@ -147,3 +148,21 @@ npm run events -- --date 2026-06-04 --limit 10
 npm run events -- --limit 10
 npm test
 ```
+
+Hackathon scraping demo:
+
+```bash
+npm run scrape -- "first 10 founder events today"
+npm run scrape -- "AI infra events today" --limit 5
+```
+
+The scrape command asks Azure to convert the plain text into Tech Week API filters:
+
+```text
+day
+track
+q
+limit
+```
+
+Then it fetches matching Tech Week events and stores that slice in Postgres.
