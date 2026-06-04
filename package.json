@@ -1,0 +1,24 @@
+{
+  "name": "ms-hack",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:setup": "node src/cli.js setup",
+    "sync": "node src/cli.js sync",
+    "sync:day": "node src/cli.js sync-day",
+    "sample": "node src/cli.js sample",
+    "tracks:source": "node src/cli.js tracks:source",
+    "tracks": "node src/cli.js tracks",
+    "events": "node src/cli.js events",
+    "recommend": "node src/cli.js recommend",
+    "serve": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
