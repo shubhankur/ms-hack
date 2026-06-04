@@ -1,7 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import type { Agenda, AgendaItem, RsvpDraft, UserProfile } from "@/lib/types";
+import { FullScreenCalendar } from "@/components/ui/fullscreen-calendar";
+import { EventDetailModal } from "@/components/event-detail-modal";
+import {
+  agendaToCalendarData,
+  buildAgendaItemMap,
+  type CalendarEvent,
+} from "@/lib/calendar-adapter";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -35,6 +42,8 @@ export default function Home() {
     agenda: Agenda;
   } | null>(null);
   const [drafts, setDrafts] = useState<Record<number, RsvpDraft>>({});
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<AgendaItem | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   async function send() {
@@ -79,6 +88,7 @@ export default function Home() {
   }
 
   async function draftRsvp(item: AgendaItem) {
+    setDraftLoading(true);
     const res = await fetch("/api/rsvp", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -87,9 +97,27 @@ export default function Home() {
     if (res.ok && res.drafts[0]) {
       setDrafts((d) => ({ ...d, [item.event.id]: res.drafts[0] }));
     }
+    setDraftLoading(false);
+  }
+
+  /** Handle calendar event click: look up the full AgendaItem and open modal. */
+  function handleCalendarEventClick(calEvent: CalendarEvent) {
+    if (!result) return;
+    const item = agendaItemMap.get(calEvent.id);
+    if (item) setSelectedItem(item);
   }
 
   const picks = result ? Object.values(result.agenda.byDay).flat() : [];
+
+  /** Derived data for the calendar (memoised to avoid re-computation on every render). */
+  const calendarData = useMemo(
+    () => (result ? agendaToCalendarData(result.agenda) : []),
+    [result],
+  );
+
+  const agendaItemMap = result
+    ? buildAgendaItemMap(result.agenda)
+    : new Map<number, AgendaItem>();
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -192,6 +220,7 @@ export default function Home() {
                               item={it}
                               draft={drafts[it.event.id]}
                               onDraft={() => draftRsvp(it)}
+                              onDetails={() => setSelectedItem(it)}
                             />
                           ))}
                         </div>
@@ -203,7 +232,45 @@ export default function Home() {
             )}
           </section>
         </div>
+
+        {/* ── Calendar view ─────────────────────────────────────── */}
+        {result && (
+          <div className="mt-6">
+            {/* Stats row above calendar */}
+            <div className="mb-3 flex items-center gap-3 text-sm">
+              <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                Calendar View
+              </span>
+              <span className="text-neutral-700">·</span>
+              <Stat n={result.totalEvents} label="events this week" muted />
+              <span className="text-neutral-600">→</span>
+              <Stat n={picks.length} label="picked for you" />
+              <span className="text-neutral-600">·</span>
+              <Stat
+                n={picks.filter((p) => p.hiddenGem).length}
+                label="hidden gems"
+                accent
+              />
+            </div>
+
+            <FullScreenCalendar
+              data={calendarData}
+              onEventClick={handleCalendarEventClick}
+            />
+          </div>
+        )}
       </div>
+
+      {/* ── Event detail modal ────────────────────────────────── */}
+      <EventDetailModal
+        item={selectedItem}
+        draft={selectedItem ? drafts[selectedItem.event.id] : undefined}
+        draftLoading={draftLoading}
+        onClose={() => setSelectedItem(null)}
+        onDraft={async (item) => {
+          await draftRsvp(item);
+        }}
+      />
     </main>
   );
 }
@@ -259,10 +326,12 @@ function EventCard({
   item,
   draft,
   onDraft,
+  onDetails,
 }: {
   item: AgendaItem;
   draft?: RsvpDraft;
   onDraft: () => void;
+  onDetails?: () => void;
 }) {
   const e = item.event;
   return (
@@ -270,7 +339,12 @@ function EventCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{e.name}</span>
+            <button
+              onClick={onDetails}
+              className="text-sm font-medium text-left hover:underline"
+            >
+              {e.name}
+            </button>
             {item.hiddenGem && (
               <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
                 HIDDEN GEM
@@ -309,6 +383,14 @@ function EventCard({
         >
           {draft ? "↻ redraft" : "✍️ draft intro"}
         </button>
+        {onDetails && (
+          <button
+            onClick={onDetails}
+            className="rounded-md bg-neutral-800 px-2 py-1 text-xs hover:bg-neutral-700"
+          >
+            Details →
+          </button>
+        )}
       </div>
 
       {draft && (
