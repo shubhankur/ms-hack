@@ -1,0 +1,19 @@
+{
+  "name": "ms-hack-functions",
+  "version": "1.0.0",
+  "description": "Azure Functions timer that refreshes the Tech Week catalog every 12h",
+  "main": "dist/src/functions/*.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "func start",
+    "prestart": "npm run build"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}
